@@ -2,8 +2,8 @@
 import jwt from "jsonwebtoken";
 import { env } from "../config/env";
 
-const ACCESS_SECRET = env.JWT_SECRET;
-const REFRESH_SECRET = env.JWT_SECRET;
+const ACCESS_SECRET = env.ACCESS_SECRET;
+const REFRESH_SECRET = env.REFRESH_SECRET;
 
 /* ======================
    TYPES
@@ -24,7 +24,7 @@ export interface RefreshTokenPayload {
 ====================== */
 export function createAccessToken(payload: AccessTokenPayload) {
     return jwt.sign(payload, ACCESS_SECRET as string, {
-        expiresIn: "15m", // 🔥 pendek
+        expiresIn: "1h", // 🔥 pendek
     });
 }
 
