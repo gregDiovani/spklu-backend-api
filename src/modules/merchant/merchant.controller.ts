@@ -51,6 +51,14 @@ export async function deleteMerchant(
   );
 }
 
+export async function createnewMerchantSecret(req: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply) {
+  return reply.send(
+    await merchantService.createnewToken(req.params.id)
+  );
+}
+
+
 export async function forceDeleteMerchant(
   req: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply
@@ -59,6 +67,9 @@ export async function forceDeleteMerchant(
     await merchantService.forceDelete(req.params.id, req.user!.id)
   );
 }
+
+
+
 
 export async function dashboard(
   req: FastifyRequest,

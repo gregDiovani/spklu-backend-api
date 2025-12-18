@@ -13,6 +13,7 @@ export const env = {
   REFRESH_SECRET: process.env.REFRESH_SECRET,
   INTERNAL_SECRET: process.env.INTERNAL_SECRET,
   XENDIT_API_KEY: process.env.XENDIT_API_KEY,
+  MASTER_KEY: process.env.MASTER_KEY
 
 
 };

@@ -43,7 +43,7 @@ export async function requireAuth(
         // 4️⃣ VERIFY JWT
         const decoded: JwtPayload = jwt.verify(
             token,
-            env.JWT_SECRET as string
+            env.ACCESS_SECRET as string
         ) as JwtPayload;
 
         // 5️⃣ ATTACH USER KE REQUEST

@@ -8,6 +8,8 @@ import { redis } from "../../config/redis";
 export async function createPayment(
   req: FastifyRequest<{ Body: CreatePaymentInput }>,
   reply: FastifyReply
+
+
 ) {
   const result = await paymentService.createPayment(
     req.body,
