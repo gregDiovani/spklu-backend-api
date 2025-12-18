@@ -1,16 +1,17 @@
 // infra/repositories/PostgresMerchantSecretRepository.ts
 
+import { db } from "../../config/db";
 import { MerchantSecret } from "./merchant.type";
 import { MerchantSecretRepository } from "./merchantSecretRepository";
 
 export class PostgresMerchantSecretRepository
     implements MerchantSecretRepository {
-    constructor(private db: any) { }
+    constructor() { }
 
     async findActiveByMerchantId(merchantId: string) {
-        const { rows } = await this.db.query(
+        const { rows } = await db.query(
             `SELECT *
-       FROM merchant_secrets
+       FROM spklu.merchant_secrets
        WHERE merchant_id = $1
          AND is_active = true
          AND deleted_at IS NULL
@@ -22,8 +23,8 @@ export class PostgresMerchantSecretRepository
     }
 
     async save(secret: MerchantSecret) {
-        await this.db.query(
-            `INSERT INTO merchant_secrets
+        await db.query(
+            `INSERT INTO spklu.merchant_secrets
        (merchant_id, secret_enc, secret_iv, secret_tag, is_active, deleted_at)
        VALUES ($1, $2, $3, $4, $5, $6)`,
             [
@@ -38,8 +39,8 @@ export class PostgresMerchantSecretRepository
     }
 
     async revokeAllByMerchantId(merchantId: string) {
-        await this.db.query(
-            `UPDATE merchant_secrets
+        await db.query(
+            `UPDATE spklu.merchant_secrets
        SET is_active = false,
            deleted_at = now()
        WHERE merchant_id = $1

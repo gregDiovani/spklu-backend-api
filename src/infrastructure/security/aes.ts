@@ -5,6 +5,12 @@ import { env } from "../../config/env";
 const ALGO = "aes-256-gcm";
 const KEY = Buffer.from(env.MASTER_KEY as string, "hex");
 
+if (KEY.length !== 32) {
+  throw new Error(
+    `Invalid MASTER_KEY length: ${KEY.length} bytes (expected 32)`
+  );
+}
+
 export function encryptAES(plain: string) {
     const iv = crypto.randomBytes(12);
     const cipher = crypto.createCipheriv(ALGO, KEY, iv);

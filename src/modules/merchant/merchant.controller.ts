@@ -51,11 +51,20 @@ export async function deleteMerchant(
   );
 }
 
-export async function createnewMerchantSecret(req: FastifyRequest<{ Params: { id: string } }>,
-  reply: FastifyReply) {
-  return reply.send(
-    await merchantService.createnewToken(req.params.id)
-  );
+export async function createnewMerchantSecret(
+  req: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+) {
+  const rawSecret = await merchantService.createnewToken(req.params.id);
+
+  return reply.code(201).send({
+    success: true,
+    message: "New merchant secret generated",
+    data: {
+      merchant_id: req.params.id,
+      secret: rawSecret, // ⚠️ tampil 1x saja
+    },
+  });
 }
 
 

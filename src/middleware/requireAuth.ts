@@ -26,11 +26,12 @@ export async function requireAuth(
 
         // 2️⃣ FALLBACK KE AUTH HEADER (MOBILE / POSTMAN)
         if (!token) {
-            const auth = req.headers.authorization;
-            if (auth?.startsWith("Bearer ")) {
-                token = auth.slice(7);
-            }
-        }
+      const auth = req.headers.authorization
+
+      if (auth && auth.startsWith("Bearer ")) {
+        token = auth.split(" ")[1]
+      }
+    }
 
         // 3️⃣ TOKEN TIDAK ADA
         if (!token) {
@@ -44,7 +45,7 @@ export async function requireAuth(
         const decoded: JwtPayload = jwt.verify(
             token,
             env.ACCESS_SECRET as string
-        ) as JwtPayload;
+        ) as any;
 
         // 5️⃣ ATTACH USER KE REQUEST
         req.user = {
