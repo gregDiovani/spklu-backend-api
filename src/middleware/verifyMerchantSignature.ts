@@ -10,68 +10,80 @@ export async function verifyMerchantSignature(
     reply: FastifyReply
 ) {
     const merchantId = request.headers["x-merchant-id"] as string;
-    const signature = request.headers["x-signature"] as string;
+    const signature = (request.headers["x-signature"] as string)?.trim();
     const timestamp = Number(request.headers["x-timestamp"]);
 
-    // 1️⃣ header wajib
     if (!merchantId || !signature || !timestamp) {
-        return reply.code(401).send({
-            message: "Missing merchant authentication headers",
-        });
+        return reply.code(401).send({ message: "Missing merchant authentication headers" });
     }
 
-    // 2️⃣ cek timestamp (anti replay)
+    // anti replay
     const now = Math.floor(Date.now() / 1000);
     if (Math.abs(now - timestamp) > MAX_DRIFT_SECONDS) {
-        return reply.code(401).send({
-            message: "Request expired",
-        });
+        return reply.code(401).send({ message: "Request expired" });
     }
 
-    // 3️⃣ cek merchant & ambil secret aktif
+    // ambil secret aktif
     const { rows } = await db.query(
-        `SELECT ms.secret_enc, ms.secret_iv, ms.secret_tag
-     FROM merchant_secrets ms
-     JOIN merchants m ON m.merchant_id = ms.merchant_id
-     WHERE ms.merchant_id = $1
-       AND ms.is_active = true
-       AND ms.deleted_at IS NULL
-       AND m.deleted_at IS NULL
-     LIMIT 1`,
+        `
+    SELECT secret_enc, secret_iv, secret_tag
+    FROM spklu.merchant_secrets
+    WHERE merchant_id = $1
+      AND is_active = true
+      AND deleted_at IS NULL
+    LIMIT 1
+    `,
         [merchantId]
     );
 
     if (!rows.length) {
-        return reply.code(401).send({
-            message: "Invalid merchant",
-        });
+        return reply.code(401).send({ message: "Invalid merchant" });
     }
 
-    // 4️⃣ decrypt merchant secret
+    // decrypt secret
     const merchantSecret = decryptAES(
         rows[0].secret_enc,
         rows[0].secret_iv,
         rows[0].secret_tag
     );
 
-    // 5️⃣ hitung ulang signature
-    const payload = request.body ?? {};
-    const dataToSign = JSON.stringify(payload) + timestamp;
+    // ⚠️ stringify HARUS sama dengan client
+    const body = request.body as {
+        type: string;
+        currency: string;
+        amount: number;
+    };
+    // ✅ FORMAT FINAL
+    const dataToSign = `${merchantId}.${timestamp}.${body.type}.${body.currency}.${body.amount}`;
+
+    // console.log("SERVER SECRET LENGTH:", merchantSecret.length);
+    // console.log(
+    //     "SERVER SECRET HEX:",
+    //     Buffer.from(merchantSecret).toString("hex")
+    // );
 
     const expectedSignature = crypto
         .createHmac("sha256", merchantSecret)
         .update(dataToSign)
         .digest("hex");
 
-    // 6️⃣ bandingkan signature
-    if (expectedSignature !== signature) {
-        return reply.code(403).send({
-            message: "Invalid signature",
-        });
+
+    console.log({
+        body,
+        dataToSign,
+        expectedSignature,
+        receivedSignature: signature,
+    });
+
+    // ✅ SAFE COMPARE
+    if (
+        !crypto.timingSafeEqual(
+            Buffer.from(expectedSignature, "hex"),
+            Buffer.from(signature, "hex")
+        )
+    ) {
+        return reply.code(403).send({ message: "Invalid signature" });
     }
 
-    // 7️⃣ attach merchant ke request (optional)
-    (request as any).merchant = {
-        merchant_id: merchantId,
-    };
+    (request as any).merchant = { merchant_id: merchantId };
 }
