@@ -3,6 +3,11 @@ import xendit from "../../config/xendit";
 import { retry } from "../../lib/retry";
 
 export class PaymentProvider {
+
+    payment_method: string = 'QRIS'
+    provider: string = 'XENDIT'
+    currency: string = 'IDR'
+
     async createQr(
         transactionId: string,
         amount: number,

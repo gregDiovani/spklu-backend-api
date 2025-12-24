@@ -11,6 +11,8 @@ import merchantRoutes from "./modules/merchant/merchant.route";
 import transactionRoutes from "./modules/transaction/transaction.route";
 import paymentRoutes from "./modules/transaction/transaction.route";
 import userRoutes from "./modules/user/user.route";
+import { db } from "./config/db";
+import { redis } from "./config/redis";
 
 
 export async function buildApp() {
@@ -33,7 +35,23 @@ export async function buildApp() {
   });
 
   await app.register(compress, { global: true });
-  app.register(cors, { origin: true, credentials: true });
+  app.register(cors, {
+    origin: (origin, cb) => {
+      // alat, server, postman
+      if (!origin) return cb(null, true);
+
+      const normalized = origin.replace(/\/$/, "");
+
+      if (
+        normalized === "https://dashboard.qunangqunang.com"
+      ) {
+        return cb(null, true);
+      }
+
+      cb(new Error("Not allowed by CORS"), false);
+    },
+    credentials: true,
+  });
   app.register(cookie, { secret: env.COOKIE_SECRET });
   app.register(helmet, { contentSecurityPolicy: false });
   app.register(rateLimit, { max: 100, timeWindow: "1 minute" });
@@ -53,7 +71,56 @@ export async function buildApp() {
   app.register(userRoutes, { prefix: "/user" });
 
 
-  app.get("/health", async () => ({ status: "ok", uptime: process.uptime() }));
+  app.get("/health", async () => {
+    const start = Date.now();
 
+    // DB check
+    let dbStatus = "ok";
+    try {
+      await db.query("SELECT 1");
+    } catch (e) {
+      dbStatus = "error";
+    }
+
+    // Redis check
+    let redisStatus = "ok";
+    try {
+      const pong = await redis.ping();
+      if (pong !== "PONG") redisStatus = "error";
+    } catch (e) {
+      redisStatus = "error";
+    }
+
+    return {
+      status: dbStatus === "ok" && redisStatus === "ok" ? "ok" : "degraded",
+      uptime: process.uptime(),
+      responseTimeMs: Date.now() - start,
+      services: {
+        api: "ok",
+        db: dbStatus,
+        redis: redisStatus,
+      },
+    };
+  });
+
+
+  app.setErrorHandler((error, request, reply) => {
+    request.log.error(
+      {
+        err: error,
+        url: request.url,
+        method: request.method,
+        body: request.body,
+        params: request.params,
+        query: request.query,
+      },
+      'Unhandled error'
+    );
+
+    reply.code(500).send({
+      success: false,
+      message: 'Internal Server Error',
+    });
+  });
   return app;
 }

@@ -1,5 +1,6 @@
 // modules/payment/payment.service.ts
 import { redis } from "../../config/redis";
+import { mapProviderToInternalStatus } from "./helper.transcation";
 import { PaymentProvider } from "./transaction.provider";
 import { TransactionRepository } from "./transaction.repository";
 import { CreatePaymentInput } from "./transaction.type";
@@ -10,7 +11,7 @@ export class PaymentService {
     private provider: PaymentProvider
   ) { }
 
-  async createPayment(
+  async createPaymentQRIS(
     input: CreatePaymentInput,
     internalSecret: string
 
@@ -23,6 +24,9 @@ export class PaymentService {
       transaction_id: transactionId,
       merchant_id: input.merchant_id,
       amount: input.amount,
+      provider: this.provider.provider,
+      currency: this.provider.currency,
+      payment_method: this.provider.payment_method,
       status: "CREATED",
       metadata: input.metadata ?? {},
     });
@@ -39,22 +43,29 @@ export class PaymentService {
         input.callback_url
       );
     } catch (err: any) {
-      await this.repo.updateTransaction(internalSecret, {
-        external_id: transactionId,
-        status: "ERROR",
-        provider_status: "ERROR",
-        last_error: JSON.stringify(err?.response?.data ?? err.message),
+      await this.repo.insertToAuditTransaction({
+        transaction_id: transactionId,
+        action: "PROVIDER_CREATE_FAILED",
+        old_status: "CREATED",
+        new_status: "CREATED", // status tidak berubah
+        payload: {
+          error: err?.response?.data ?? err.message,
+        },
+        note: "Failed to create QR at provider",
+        performed_by: "system",
       });
-      throw err;
+
+
     }
 
     await this.repo.updateTransaction(internalSecret, {
       external_id: transactionId,
-      status: invoice.status === "ACTIVE" ? "ACTIVE" : "PENDING",
+      status: mapProviderToInternalStatus(invoice.status),
       provider_status: invoice.status,
       provider_ref: invoice.id,
       provider_response: invoice,
       qr_string: invoice.qr_string,
+
     });
 
     return { transaction_id: transactionId, invoice };

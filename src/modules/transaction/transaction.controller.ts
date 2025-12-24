@@ -4,6 +4,7 @@ import { paymentService } from "../../container";
 import { env } from "../../config/env";
 import { CreatePaymentInput, WebhookInput } from "./transaction.type";
 import { redis } from "../../config/redis";
+import { XenditQrPaymentWebhook } from "./webhook.type";
 
 export async function createPayment(
   req: FastifyRequest<{ Body: CreatePaymentInput }>,
@@ -11,7 +12,7 @@ export async function createPayment(
 
 
 ) {
-  const result = await paymentService.createPayment(
+  const result = await paymentService.createPaymentQRIS(
     req.body,
     env.INTERNAL_SECRET as string
   );
@@ -30,7 +31,7 @@ export async function getPayment(
 }
 
 export async function webhookXendit(
-  req: FastifyRequest,
+  req: FastifyRequest<{ Body: XenditQrPaymentWebhook }>,
   reply: FastifyReply
 ) {
   // 1️⃣ Verifikasi kalau memang xendit yang nembak
@@ -38,21 +39,19 @@ export async function webhookXendit(
     return reply.code(401).send({ success: false });
   }
 
-  // 2️⃣ Normalize payload (HTTP → domain)
-  const body: any = req.body;
-  const data = body?.data ?? body ?? {};
+  const body = req.body
 
-  // body dari xenditnya 
-  const input: WebhookInput = {
-    externalId: data.reference_id ?? data.external_id ?? null,
-    providerRef: data.id ?? null,
-    providerStatus: String(data.status ?? "").trim(),
-    providerEventId: data.id ?? null,
+  console.log(body);
+
+  const input = {
+    externalId: body.qr_code.external_id,
+    providerStatus: body.status,
+    providerEventId: body.qr_code.id,
     payload: body,
-  };
+  }
 
 
-  await redis.lpush(
+  redis.lpush(
     "xendit:webhook",
     JSON.stringify(input)
   );

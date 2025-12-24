@@ -5,7 +5,7 @@ async function start() {
   const app = await buildApp();
   await app.listen({ port: Number(env.PORT), host: "0.0.0.0" });
 
-    console.log(`🚀 Server running on http://localhost:${env.PORT}`);
+  console.log(`🚀 Server running on http://localhost:${env.PORT}`);
 
 
   const shutdown = async () => {

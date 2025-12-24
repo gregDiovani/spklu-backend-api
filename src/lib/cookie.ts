@@ -1,4 +1,5 @@
 import { FastifyReply } from "fastify";
+import { env } from "../config/env";
 
 /* =========================
    COOKIE CONSTANTS
@@ -6,13 +7,16 @@ import { FastifyReply } from "fastify";
 export const ACCESS_COOKIE = "sb_access_token";
 export const REFRESH_COOKIE = "sb_refresh_token";
 
-const BASE_COOKIE_OPTIONS = {
+const IS_PROD = env.NODE_ENV === "production";
+
+export const BASE_COOKIE_OPTIONS = {
     httpOnly: true as const,
-    sameSite: "strict" as const,
     path: "/",
-    secure: process.env.NODE_ENV === "production",
+    sameSite: IS_PROD ? "none" as const : "lax" as const,
+    secure: IS_PROD,
 };
 
+/* ========
 /* =========================
    SET AUTH COOKIES
 ========================= */
@@ -34,6 +38,10 @@ export function setAuthCookies(
 ========================= */
 export function clearAuthCookies(reply: FastifyReply) {
     reply
-        .clearCookie(ACCESS_COOKIE, { path: "/" })
-        .clearCookie(REFRESH_COOKIE, { path: "/" });
+        .clearCookie(ACCESS_COOKIE, {
+            ...BASE_COOKIE_OPTIONS,
+        })
+        .clearCookie(REFRESH_COOKIE, {
+            ...BASE_COOKIE_OPTIONS,
+        });
 }

@@ -32,19 +32,34 @@ export class UserRepository {
   update(userId: string, payload: any) {
     return db.query(
       `
-      UPDATE spklu.main_user_access
-      SET merchant_id = $1,
-          role_id = $2,
-          username = $3,
-          expired_at = $4,
-          updated_at = NOW()
-      WHERE user_id = $5
-      RETURNING *
+      WITH updated AS (
+  UPDATE spklu.main_user_access
+  SET
+    merchant_id = $1,
+    expired_at  = $2,
+    updated_at  = NOW()
+  WHERE user_id = $3
+  RETURNING
+    user_id,
+    username,
+    merchant_id,
+    role_id
+)
+SELECT
+  u.user_id,
+  u.username,
+  u.merchant_id,
+  m.merchant_name,
+  r.role_id,
+  r.name AS role_name
+FROM updated u
+JOIN spklu.master_roles r
+  ON r.role_id = u.role_id
+LEFT JOIN spklu.master_merchant m
+  ON m.merchant_id = u.merchant_id;
       `,
       [
         payload.merchant_id,
-        payload.role_id,
-        payload.username,
         payload.expired_at ?? null,
         userId,
       ]

@@ -24,7 +24,7 @@ export interface RefreshTokenPayload {
 ====================== */
 export function createAccessToken(payload: AccessTokenPayload) {
     return jwt.sign(payload, ACCESS_SECRET as string, {
-        expiresIn: "1h", // 🔥 pendek
+        expiresIn: "10m", // 🔥 pendek
     });
 }
 
