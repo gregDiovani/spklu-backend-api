@@ -35,11 +35,23 @@ export async function buildApp() {
   });
 
   await app.register(compress, { global: true });
-  await app.register(cors, {
-    origin: "http://localhost:3000",
-    credentials: true
-  })
+  app.register(cors, {
+    origin: (origin, cb) => {
+      // alat, server, postman
+      if (!origin) return cb(null, true);
 
+      const normalized = origin.replace(/\/$/, "");
+
+      if (
+        normalized === "https://dashboard.qunangqunang.com"
+      ) {
+        return cb(null, true);
+      }
+
+      cb(new Error("Not allowed by CORS"), false);
+    },
+    credentials: true,
+  });
   app.register(cookie, { secret: env.COOKIE_SECRET });
   app.register(helmet, { contentSecurityPolicy: false });
   app.register(rateLimit, { max: 100, timeWindow: "1 minute" });
