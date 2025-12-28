@@ -13,9 +13,7 @@ export async function createPayment(
 
 ) {
   const result = await paymentService.createPaymentQRIS(
-    req.body,
-    env.INTERNAL_SECRET as string
-  );
+    req.body  );
   return reply.send({ success: true, ...result });
 }
 
@@ -41,7 +39,7 @@ export async function webhookXendit(
 
   const body = req.body
 
-  console.log(body);
+  // console.log(body);
 
   const input = {
     externalId: body.qr_code.external_id,
@@ -59,9 +57,5 @@ export async function webhookXendit(
   return reply.send({ success: true });
 
 
-  // // 3️⃣ Delegate to service
-  // const result = await paymentService.handleWebhook(input);
 
-  // // 4️⃣ HTTP response
-  // return reply.send(result);
 }

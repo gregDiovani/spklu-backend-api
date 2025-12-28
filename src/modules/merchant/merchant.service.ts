@@ -9,7 +9,7 @@ export class MerchantService {
     // 1. create merchant (DB function)
     const result = await this.repo.create(data, callerId);
 
-    console.log(result)
+    // console.log(result)
 
     if (!result?.success) {
       return result;

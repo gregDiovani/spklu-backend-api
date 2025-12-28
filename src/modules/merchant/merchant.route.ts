@@ -9,7 +9,7 @@ export default async function merchantRoutes(app: FastifyInstance) {
   app.post("/", c.createMerchant);
 
 
-  app.post("/:id/rotate-token", c.createnewMerchantSecret);
+  app.post("/:id/rotate-token", c.createNewMerchantSecret);
 
   app.get("/", c.getMyMerchants);
   app.put("/:id", c.updateMerchant);

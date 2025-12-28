@@ -35,11 +35,31 @@ export async function buildApp() {
   });
 
   await app.register(compress, { global: true });
-  await app.register(cors, {
-    origin: "http://localhost:3000",
-    credentials: true
-  })
+        app.register(cors, {
+        origin: (origin, cb) => {
+          // allow tools without origin (curl, postman, native server calls)
+          if (!origin) return cb(null, true);
 
+          // DEV MODE — allow everything
+          if (process.env.NODE_ENV !== "production") {
+            return cb(null, true);
+          }
+
+          // PROD MODE — restrict
+          const normalized = origin.replace(/\/$/, "");
+
+          const allowed = [
+            "https://dashboard.qunangqunang.com",
+          ];
+
+          if (allowed.includes(normalized)) {
+            return cb(null, true);
+          }
+
+          cb(new Error("Not allowed by CORS"), false);
+        },
+        credentials: true,
+      });
   app.register(cookie, { secret: env.COOKIE_SECRET });
   app.register(helmet, { contentSecurityPolicy: false });
   app.register(rateLimit, { max: 100, timeWindow: "1 minute" });

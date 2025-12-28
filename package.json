@@ -3,14 +3,13 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev:api": "tsx watch src/server.ts",
-    "dev:worker": "tsx watch src/worker.ts",
-    "dev": "concurrently -n API,WORKER -c blue,green \"npm run dev:api\" \"npm run dev:worker\"",
+      "test": "cross-env NODE_ENV=test jest --detectOpenHandles --forceExit",
+    "dev:api": "cross-env NODE_ENV=development tsx watch src/server.ts",
+    "dev:worker": "cross-env NODE_ENV=development tsx watch src/worker.ts",
+    "dev": "cross-env NODE_ENV=test concurrently -n API,WORKER -c blue,green \"npm run dev:api\" \"npm run dev:worker\"",
     "build": "tsc",
-    "build:api": "tsc --project tsconfig.json",
-    "build:worker": "tsc --project tsconfig.json",
-    "start:api": "node dist/server.js",
-    "start:worker": "node dist/worker.js",
+    "start:api": "cross-env NODE_ENV=production node dist/server.js",
+    "start:worker": "cross-env NODE_ENV=production node dist/worker.js",
     "start": "concurrently -n API,WORKER -c blue,green \"npm run start:api\" \"npm run start:worker\""
   },
   "dependencies": {
@@ -31,10 +30,17 @@
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
+    "@types/jest": "^30.0.0",
     "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^20.14.9",
     "@types/pg": "^8.16.0",
+    "@types/supertest": "^6.0.3",
     "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "jest": "^30.2.0",
+    "supertest": "^7.1.4",
+    "ts-jest": "^29.4.6",
+    "ts-node": "^10.9.2",
     "tsx": "^4.16.2",
     "typescript": "^5.5.4"
   }

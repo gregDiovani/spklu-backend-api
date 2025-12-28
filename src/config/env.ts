@@ -1,10 +1,17 @@
 
 // config/env.ts
 import dotenv from "dotenv";
-dotenv.config();
+
+dotenv.config({
+  path:
+    process.env.NODE_ENV === "production"
+      ? ".env.prod"
+      : ".env.dev",
+});
+
 
 export const env = {
-  NODE_ENV: process.env.NODE_ENV ?? "development",
+  NODE_ENV: process.env.NODE_ENV,
   PORT: Number(process.env.PORT ?? 3000),
   DB_URL: process.env.DB_URL ?? "",
   COOKIE_SECRET: process.env.COOKIE_SECRET ?? "dev-secret",

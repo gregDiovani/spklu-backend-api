@@ -9,8 +9,8 @@ export class TransactionRepository {
     return callRpc("spklu.create_payment_transaction", [payload]);
   }
 
-  updateTransaction(secret: string, payload: unknown) {
-    return callRpc("spklu.update_payment_transaction", [secret, payload]);
+  updateTransaction( payload: unknown) {
+    return callRpc("spklu.update_payment_transaction", ['', payload]);
   }
 
   async insertToAuditTransaction(input: {
@@ -77,7 +77,7 @@ export class TransactionRepository {
 
   getTransactionById(id: string) {
     return db.query(
-      `SELECT transaction_id, provider_status, amount
+      `SELECT transaction_id, status, amount
        FROM spklu.payment_transactions
        WHERE transaction_id = $1
        LIMIT 1`,

@@ -8,7 +8,21 @@ export class PostgresMerchantSecretRepository
     implements MerchantSecretRepository {
     constructor() { }
 
-    async findActiveByMerchantId(merchantId: string) {
+    async findActiveMerchant(merchant_id: string) {
+        const { rows } = await db.query(
+            `SELECT *
+       FROM spklu.master_merchant
+       WHERE merchant_id = $1
+         AND deleted_at IS NULL
+       LIMIT 1`,
+            [merchant_id]
+        );
+
+        return rows[0] ?? null;
+
+    }
+
+    async findActiveKeyByMerchantId(merchantId: string) {
         const { rows } = await db.query(
             `SELECT *
        FROM spklu.merchant_secrets

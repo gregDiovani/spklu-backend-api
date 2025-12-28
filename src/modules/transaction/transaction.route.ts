@@ -6,7 +6,6 @@ import { CreatePaymentInput } from "./transaction.type";
 
 export default async function paymentRoutes(app: FastifyInstance) {
   app.post<{ Body: CreatePaymentInput }>("/payments", {
-    preHandler: verifyMerchantSignature
   },
     c.createPayment);
   app.get("/payments/:id",

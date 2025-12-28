@@ -37,3 +37,6 @@ coverage/
 # ===== Temp =====
 tmp/
 .temp/
+
+# Local docker compose (dev only)
+docker-compose.yml

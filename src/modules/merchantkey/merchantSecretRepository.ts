@@ -1,9 +1,12 @@
 // domain/repositories/MerchantSecretRepository.ts
 
+import { Merchant } from "../merchant/merchant.type";
 import { MerchantSecret } from "./merchant.type";
 
 export interface MerchantSecretRepository {
-    findActiveByMerchantId(
+
+    findActiveMerchant(merchantId: string): Promise<Merchant | null>;
+    findActiveKeyByMerchantId(
         merchantId: string
     ): Promise<MerchantSecret | null>;
 

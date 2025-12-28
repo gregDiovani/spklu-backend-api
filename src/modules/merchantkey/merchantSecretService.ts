@@ -2,10 +2,11 @@
 import crypto from "crypto";
 import { decryptAES, encryptAES } from "../../infrastructure/security/aes";
 import { MerchantSecretRepository } from "./merchantSecretRepository";
+import { MerchantService } from "../merchant/merchant.service";
 
 export class MerchantSecretService {
     constructor(
-        private readonly repo: MerchantSecretRepository
+        private readonly repo: MerchantSecretRepository,
     ) { }
 
     // CREATE
@@ -29,7 +30,7 @@ export class MerchantSecretService {
 
     // REVEAL
     async reveal(merchantId: string): Promise<string> {
-        const secret = await this.repo.findActiveByMerchantId(
+        const secret = await this.repo.findActiveKeyByMerchantId(
             merchantId
         );
 
@@ -46,25 +47,30 @@ export class MerchantSecretService {
 
     // ROTATE
     async rotate(merchantId: string): Promise<string> {
+        // 1️⃣ ambil merchant
+
+        // 4️⃣ revoke semua key lama
         await this.repo.revokeAllByMerchantId(merchantId);
 
+        // 5️⃣ buat key baru
         return this.create(merchantId);
     }
 
 
     // buat token baru
     async generateNewToken(merchantId: string): Promise<string> {
-        // 1. revoke semua secret lama
+        const merchant = await this.repo.findActiveMerchant(merchantId);
+
+        if (!merchant) throw new Error("Merchant not found");
+
+        if (merchant.deleted_at) throw new Error("Merchant has been deleted");
+
         await this.repo.revokeAllByMerchantId(merchantId);
 
-        // 2. generate token baru
-        const rawSecret =
-            "mk_" + crypto.randomBytes(32).toString("hex");
+        const rawSecret = "mk_" + crypto.randomBytes(32).toString("hex");
 
-        // 3. encrypt
         const encrypted = encryptAES(rawSecret);
 
-        // 4. simpan
         await this.repo.save({
             merchant_id: merchantId,
             secret_enc: encrypted.enc,
@@ -74,8 +80,6 @@ export class MerchantSecretService {
             deleted_at: null,
         });
 
-        // 5. return RAW token (1x)
         return rawSecret;
     }
-
 }
