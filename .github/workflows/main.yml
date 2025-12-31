@@ -2,7 +2,7 @@ name: Deploy Fastify App
 
 on:
   push:
-    branches: ['main'] # ganti 'main' kalau perlu
+    branches: ['master'] # ganti 'main' kalau perlu
   workflow_dispatch:
 
 jobs:
