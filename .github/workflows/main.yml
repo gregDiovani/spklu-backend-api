@@ -24,15 +24,24 @@ jobs:
             git pull
 
             echo "📦 Install dependencies"
-            npm install
+            npm install --production
 
             echo "🏗 Build TypeScript"
             npm run build
 
-            echo "🚀 Start app with PM2 (memory limit 300MB)"
-            pm2 start npm --name backend --max-memory-restart 300M -- start || pm2 restart backend
+            echo "🚀 Start / Restart PM2 with 300MB RAM limit"
+            if pm2 describe backend > /dev/null; then
+              echo "🔁 Restart existing service"
+              pm2 restart backend --max-memory-restart 300M
+            else
+              echo "✨ Create new service"
+              pm2 start npm --name backend --max-memory-restart 300M -- start
+            fi
 
             echo "💾 Save PM2 state"
             pm2 save
 
-            echo "✅ DONE "
+            echo "🧹 Cleanup old logs (optional)"
+            pm2 flush
+
+            echo "✅ DONE"
