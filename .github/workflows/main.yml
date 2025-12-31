@@ -1,6 +1,8 @@
 name: Deploy Fastify App
 
 on:
+  push:
+    branches: ['master']   # ganti ke 'main' kalau perlu
   workflow_dispatch:
 
 jobs:
@@ -8,15 +10,26 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Connect & Deploy
+      - name: Deploy to VPS
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
+            echo "🔄 Go to project folder"
             cd /srv/backend
+
+            echo "🔄 Pull latest code"
             git pull
-            npm install
+
+            echo "📦 Install dependencies"
+            npm install --production
+
+            echo "🚀 Restart PM2"
             pm2 restart backend || pm2 start src/index.js --name backend
+
+            echo "💾 Save PM2 state"
             pm2 save
+
+            echo "✅ DONE"
