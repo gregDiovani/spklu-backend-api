@@ -2,7 +2,7 @@ name: Deploy Fastify App
 
 on:
   push:
-    branches: ['main']   # ganti 'main' kalau perlu
+    branches: ['main'] # ganti 'main' kalau perlu
   workflow_dispatch:
 
 jobs:
@@ -35,4 +35,4 @@ jobs:
             echo "💾 Save PM2 state"
             pm2 save
 
-            echo "✅ DONE"
+            echo "✅ DONE "
