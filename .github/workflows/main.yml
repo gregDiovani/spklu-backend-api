@@ -29,8 +29,8 @@ jobs:
             echo "🏗 Build TypeScript"
             npm run build
 
-            echo "🚀 Start with PM2 (npm start)"
-            pm2 start npm --name backend -- start || pm2 restart backend
+            echo "🚀 Start app with PM2 (memory limit 300MB)"
+            pm2 start npm --name backend --max-memory-restart 300M -- start || pm2 restart backend
 
             echo "💾 Save PM2 state"
             pm2 save
