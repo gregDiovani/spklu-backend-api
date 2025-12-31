@@ -41,7 +41,4 @@ jobs:
             echo "💾 Save PM2 state"
             pm2 save
 
-            echo "🧹 Cleanup old logs (optional)"
-            pm2 flush
-
             echo "✅ DONE"
