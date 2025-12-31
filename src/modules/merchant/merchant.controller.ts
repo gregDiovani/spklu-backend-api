@@ -51,6 +51,49 @@ export async function deleteMerchant(
   );
 }
 
+export async function createNewMerchantSecret(
+  req: FastifyRequest<{ Params: { id: string } }>,
+  reply: FastifyReply
+) {
+  try {
+    const rawSecret = await merchantService.createnewToken(req.params.id);
+
+    return reply.code(201).send({
+      success: true,
+      message: "New merchant secret generated",
+      data: {
+        merchant_id: req.params.id,
+        secret: rawSecret,
+      },
+    });
+
+  } catch (err: any) {
+
+    req.log.error(err);
+
+    if (err.message === "Merchant not found") {
+      return reply.code(404).send({
+        success: false,
+        message: err.message,
+      });
+    }
+
+    if (err.message === "Merchant has been deleted") {
+      return reply.code(410).send({
+        success: false,
+        message: err.message,
+      });
+    }
+
+    return reply.code(500).send({
+      success: false,
+      message: "Failed to generate merchant secret",
+    });
+  }
+}
+
+
+
 export async function forceDeleteMerchant(
   req: FastifyRequest<{ Params: { id: string } }>,
   reply: FastifyReply
@@ -59,6 +102,9 @@ export async function forceDeleteMerchant(
     await merchantService.forceDelete(req.params.id, req.user!.id)
   );
 }
+
+
+
 
 export async function dashboard(
   req: FastifyRequest,

@@ -1,11 +1,33 @@
 // modules/merchant/merchant.service.ts
+import { MerchantSecretService } from "../merchantkey/merchantSecretService";
 import { MerchantRepository } from "./merchant.repository";
 
 export class MerchantService {
-  constructor(private repo: MerchantRepository) { }
+  constructor(private repo: MerchantRepository, private secretService: MerchantSecretService) { }
 
-  create(data: any, callerId: string) {
-    return this.repo.create(data, callerId);
+  async create(data: any, callerId: string) {
+    // 1. create merchant (DB function)
+    const result = await this.repo.create(data, callerId);
+
+    // console.log(result)
+
+    if (!result?.success) {
+      return result;
+    }
+
+    const merchantId = result.data.merchant_id;
+
+    // 2. create merchant secret
+    const secret = await this.secretService.create(merchantId);
+
+    // 3. merge response
+    return {
+      ...result,
+      data: {
+        ...result.data,
+        merchant_secret: secret, // RAW secret (1x)
+      },
+    };
   }
 
   getMyMerchants(callerId: string, limit: number, page: number) {
@@ -19,6 +41,13 @@ export class MerchantService {
   delete(id: string, callerId: string) {
     return this.repo.delete(id, callerId);
   }
+
+  createnewToken(merchantId: string) {
+    return this.secretService.generateNewToken(merchantId);
+  }
+
+
+
 
   forceDelete(id: string, callerId: string) {
     return this.repo.forceDelete(id, callerId);
