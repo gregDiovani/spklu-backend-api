@@ -2,7 +2,7 @@ name: Deploy Fastify App
 
 on:
   push:
-    branches: ['master'] # ganti 'main' kalau perlu
+    branches: ['master']
   workflow_dispatch:
 
 jobs:
@@ -29,14 +29,9 @@ jobs:
             echo "🏗 Build TypeScript"
             npm run build
 
-            echo "🚀 Start / Restart PM2 with 300MB RAM limit"
-            if pm2 describe backend > /dev/null; then
-              echo "🔁 Restart existing service"
-              pm2 restart backend --max-memory-restart 300M
-            else
-              echo "✨ Create new service"
-              pm2 start npm --name backend --max-memory-restart 300M -- start
-            fi
+            echo "🚀 Start / Restart PM2 from ecosystem file"
+            pm2 start ecosystem.config.js || true
+            pm2 restart backend || true
 
             echo "💾 Save PM2 state"
             pm2 save
