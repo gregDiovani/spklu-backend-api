@@ -11,29 +11,38 @@ jobs:
 
     steps:
       - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            echo "📁 Go to project"
-            cd /srv/backend
+      uses: appleboy/ssh-action@v1.2.0
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_KEY }}
+        script: |
+          set -e
+          export PATH=$PATH:/usr/local/bin
 
-            echo "🔄 Pull latest code"
-            git pull
+          echo "📁 Go to project"
+          cd /srv/backend
 
-            echo "📦 Install dependencies"
-            npm install --production
+          echo "🔄 Pull latest code"
+          git pull origin master
 
-            echo "🏗 Build TypeScript"
-            npm run build
+          echo "📦 Install dependencies"
+          npm ci --only=production
 
-            echo "🚀 Start / Restart PM2 from ecosystem file"
-            pm2 start ecosystem.config.js || true
-            pm2 restart backend || true
+          echo "🏗 Build project"
+          npm run build
 
-            echo "💾 Save PM2 state"
-            pm2 save
+          echo "🧪 Check build output"
+          if [ ! -f "dist/index.js" ]; then
+            echo "❌ Build failed — dist/index.js not found"
+            exit 1
+          fi
 
-            echo "✅ DONE"
+          echo "🚀 Reload PM2 from ecosystem"
+          pm2 start ecosystem.config.js --update-env || true
+          pm2 reload ecosystem.config.js --update-env
+
+          echo "💾 Save PM2 state"
+          pm2 save
+
+          echo "✅ DONE — app deployed successfully"
