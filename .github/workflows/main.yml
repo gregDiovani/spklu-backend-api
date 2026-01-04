@@ -24,7 +24,7 @@ jobs:
             cd /srv/backend
 
             echo "📦 Install dependencies"
-            npm ci --only=production
+            npm install
 
             echo "🏗 Build TypeScript"
             npm run build
