@@ -13,6 +13,7 @@ import paymentRoutes from "./modules/transaction/transaction.route";
 import userRoutes from "./modules/user/user.route";
 import { db } from "./config/db";
 import { redis } from "./config/redis";
+import portfolioRoutes from "./modules/gregorio/portofolio.route";
 
 
 export async function buildApp() {
@@ -34,7 +35,7 @@ export async function buildApp() {
     },
   });
 
-  await app.register(compress, { global: true });
+
         app.register(cors, {
         origin: (origin, cb) => {
           // allow tools without origin (curl, postman, native server calls)
@@ -72,11 +73,16 @@ export async function buildApp() {
     });
   });
 
+
+
   app.register(authRoutes, { prefix: "/auth" });
   app.register(merchantRoutes, { prefix: "/merchant" });
   app.register(transactionRoutes, { prefix: "/transaction" });
   app.register(paymentRoutes, { prefix: "/payment" });
   app.register(userRoutes, { prefix: "/user" });
+
+app.register(portfolioRoutes, { prefix: "/portfolio" });
+
 
 
   app.get("/health", async () => {
