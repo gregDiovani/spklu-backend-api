@@ -7,6 +7,12 @@ export const db = new Pool({
 });
 
 
+export const dbPostgreSQL = new Pool({
+    connectionString: env.DB_URL_DEFAULT,
+
+});
+
+
 
 
 // optional: logging
