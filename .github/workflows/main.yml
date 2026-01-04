@@ -23,9 +23,6 @@ jobs:
             echo "📁 Go to project"
             cd /srv/backend
 
-            echo "🔄 Pull latest code"
-            git pull origin master
-
             echo "📦 Install dependencies"
             npm ci --only=production
 
