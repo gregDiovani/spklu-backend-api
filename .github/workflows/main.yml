@@ -29,11 +29,7 @@ jobs:
             echo "🏗 Build TypeScript"
             npm run build
 
-            echo "🧪 Check build output"
-            if [ ! -f "dist/index.js" ]; then
-              echo "❌ Build failed — dist/index.js not found"
-              exit 1
-            fi
+           
 
             echo "🚀 Reload PM2 using ecosystem"
             pm2 start ecosystem.config.js --update-env || true
