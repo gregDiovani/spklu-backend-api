@@ -51,6 +51,7 @@ export async function buildApp() {
 
           const allowed = [
             "https://dashboard.qunangqunang.com",
+            "https://gregdiovani.my.id"
           ];
 
           if (allowed.includes(normalized)) {
