@@ -10,7 +10,7 @@ import { UserService } from "./modules/user/user.service";
 import { MerchantSecretService } from "./modules/merchantkey/merchantSecretService";
 import { PostgresMerchantSecretRepository } from "./modules/merchantkey/merchantkeyrepository";
 import { PortfolioRepository } from "./modules/gregorio/portfolio.repository";
-import { db, dbPostgreSQL } from "./config/db";
+import { dbPostgreSQL } from "./config/db";
 import { PortfolioService } from "./modules/gregorio/portfolio.service";
 import { FileService } from "./modules/gregorio/file.sertvice";
 

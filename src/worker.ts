@@ -1,56 +1,69 @@
-// src/worker.ts
-import pino from "pino";
-import { redis } from "./config/redis";
-import { paymentService } from "./container";
+import pino from 'pino';
+import { redis } from './config/redis';
+import { paymentService } from './container';
+import { prisma } from './lib/prisma';
 
 const logger = pino({
-    level: process.env.NODE_ENV === "production" ? "info" : "debug",
-    transport:
-        process.env.NODE_ENV !== "production"
-            ? {
-                target: "pino-pretty",
-                options: { colorize: true },
-            }
-            : undefined,
+  level: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
+  transport:
+    process.env.NODE_ENV !== 'production'
+      ? {
+          target: 'pino-pretty',
+          options: { colorize: true },
+        }
+      : undefined,
 });
 
-async function startWorker() {
-    logger.info("🚀 Payment worker started");
+async function processRedisQueue() {
+  while (true) {
+    const result = await redis.brpop('xendit:webhook', 1);
+    if (!result) break;
 
-    while (true) {
-        const result = await redis.brpop("xendit:webhook", 0);
-        if (!result) continue;
-
-        const raw = result[1];
-
-        let payload: any;
-        try {
-            payload = JSON.parse(raw);
-        } catch (err) {
-            logger.error({ raw }, "Invalid webhook JSON");
-            continue;
-        }
-
-        const ctx = {
-            event: payload.event,
-            external_id: payload.data?.external_id,
-            payment_id: payload.data?.id,
-        };
-
-        logger.info(ctx, "Webhook job received");
-
-        try {
-            await paymentService.handleWebhook(payload);
-            logger.info(ctx, "Webhook job completed");
-        } catch (err) {
-            logger.error(
-                { ...ctx, err },
-                "Webhook job failed,   to retry"
-            );
-
-            await redis.lpush("xendit:webhook:retry", raw);
-        }
+    const raw = result[1];
+    try {
+      const payload = JSON.parse(raw);
+      await paymentService.handleWebhook(payload);
+    } catch (err) {
+      logger.error({ err }, 'Webhook job failed from Redis queue');
     }
+  }
 }
 
-startWorker();
+async function processDbFallback() {
+  const events = await prisma.webhookEvent.findMany({
+    where: { processed_at: null },
+    orderBy: { created_at: 'asc' },
+    take: 20,
+  });
+
+  for (const event of events) {
+    try {
+      const payload: any = event.payload;
+      await paymentService.handleWebhook({
+        transactionId: event.transaction_id,
+        providerRef: payload?.qr_code?.id ?? null,
+        providerStatus: payload?.status ?? 'PENDING',
+        providerEventId: event.provider_event_id,
+        payload,
+      });
+    } catch (err: any) {
+      logger.error({ err, eventId: event.id }, 'DB fallback webhook failed');
+      await prisma.webhookEvent.update({
+        where: { id: event.id },
+        data: { process_error: err?.message ?? 'failed' },
+      });
+    }
+  }
+}
+
+async function loop() {
+  logger.info('🚀 Prisma payment worker started');
+  while (true) {
+    await processRedisQueue();
+    await processDbFallback();
+    await paymentService.reconcilePending(20);
+    await new Promise((r) => setTimeout(r, 60_000));
+  }
+}
+
+loop();

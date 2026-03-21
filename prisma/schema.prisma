@@ -1,0 +1,125 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DB_URL")
+  schemas  = ["spklu", "public"]
+}
+
+enum PaymentStatus {
+  CREATED
+  PENDING
+  PAID
+  EXPIRED
+  FAILED
+  CANCELED
+
+  @@schema("spklu")
+}
+
+model PaymentTransaction {
+  transaction_id   String        @id @db.VarChar
+  merchant_id      String        @db.VarChar
+  amount           Decimal       @db.Decimal(18, 2)
+  currency         String?       @default("IDR") @db.VarChar(10)
+  payment_method   String?       @db.VarChar
+  provider         String?       @db.VarChar
+  provider_ref     String?       @db.VarChar
+  status           PaymentStatus
+  metadata         Json?         @default("{}")
+  created_at       DateTime?     @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?     @default(now()) @db.Timestamptz(6)
+  provider_status  String?       @db.VarChar
+  qr_string        String?
+  last_checked_at  DateTime?     @db.Timestamptz(6)
+  paid_at          DateTime?     @db.Timestamptz(6)
+
+  auditLogs        PaymentTransactionAudit[]
+  jobs             PaymentTransactionJob?
+  reconcileJobs    ReconcileJob[]
+  webhookEvents    WebhookEvent[]
+
+  @@index([provider_ref])
+  @@index([status, created_at])
+  @@map("payment_transactions")
+  @@schema("spklu")
+}
+
+model PaymentTransactionAudit {
+  id                BigInt              @id @default(autoincrement())
+  transaction_id    String?             @db.VarChar
+  action            String              @db.VarChar
+  payload           Json?
+  performed_by      String?
+  performed_at      DateTime?           @default(now()) @db.Timestamptz(6)
+  note              String?
+  old_status        String?
+  new_status        String?
+  provider_event_id String?
+  provider_response Json?
+  changed_by        String?
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+
+  payment           PaymentTransaction? @relation(fields: [transaction_id], references: [transaction_id])
+
+  @@index([transaction_id])
+  @@index([provider_event_id])
+  @@map("payment_transactions_audit")
+  @@schema("spklu")
+}
+
+model PaymentTransactionJob {
+  transaction_id   String             @id
+  send_attempts    Int?               @default(0)
+  last_attempt_at  DateTime?          @db.Timestamptz(6)
+  last_error       String?
+  next_retry_at    DateTime?          @db.Timestamptz(6)
+  locked_at        DateTime?          @db.Timestamptz(6)
+  locked_by        String?
+  created_at       DateTime?          @default(now()) @db.Timestamptz(6)
+  updated_at       DateTime?          @default(now()) @db.Timestamptz(6)
+
+  payment          PaymentTransaction @relation(fields: [transaction_id], references: [transaction_id])
+
+  @@index([locked_at])
+  @@index([next_retry_at])
+  @@map("payment_transaction_jobs")
+  @@schema("spklu")
+}
+
+model ReconcileJob {
+  id             BigInt             @id @default(autoincrement())
+  transaction_id String
+  reason         String?
+  payload        Json?
+  created_at     DateTime?          @default(now()) @db.Timestamptz(6)
+  processed      Boolean?           @default(false)
+  processed_at   DateTime?          @db.Timestamptz(6)
+
+  payment        PaymentTransaction @relation(fields: [transaction_id], references: [transaction_id])
+
+  @@index([processed, created_at])
+  @@map("reconcile_jobs")
+  @@schema("spklu")
+}
+
+model WebhookEvent {
+  id                BigInt              @id @default(autoincrement())
+  provider_name     String
+  provider_event_id String?
+  event_key         String    @unique
+  transaction_id    String?
+  payload           Json
+  created_at        DateTime?           @default(now()) @db.Timestamptz(6)
+  processed_at      DateTime?           @db.Timestamptz(6)
+  process_error     String?
+
+  payment           PaymentTransaction? @relation(fields: [transaction_id], references: [transaction_id])
+
+  @@unique([provider_name, provider_event_id])
+  @@index([processed_at, created_at])
+  @@map("webhook_events")
+  @@schema("spklu")
+}

@@ -1,192 +1,287 @@
-// modules/payment/payment.repository.ts
-import { db } from "../../config/db";
-import { callRpc } from "../../lib/pgrpc";
-import { mapProviderToInternalStatus } from "./helper.transcation";
+import { Prisma, PaymentStatus } from '@prisma/client';
+import { prisma } from '../../lib/prisma';
+import { CreatePaymentDTO } from './dto/create-payment.dto';
+
 
 export class TransactionRepository {
-
-  createTransaction(payload: unknown) {
-    return callRpc("spklu.create_payment_transaction", [payload]);
+  findByIdempotencyKey(idempotencyKey: string) {
+    return prisma.paymentTransaction.findFirst({
+      where: {
+        auditLogs: {
+          some: {
+            action: 'IDEMPOTENCY_REGISTERED',
+            note: idempotencyKey,
+          },
+        },
+      },
+    });
   }
 
-  updateTransaction( payload: unknown) {
-    return callRpc("spklu.update_payment_transaction", ['', payload]);
-  }
+  async createTransaction(dto: CreatePaymentDTO, transactionId: string) {
+    return prisma.$transaction(async (tx) => {
+      const payment = await tx.paymentTransaction.create({
+        data: {
+          transaction_id: transactionId,
+          merchant_id: dto.merchantId,
+          amount: new Prisma.Decimal(dto.amount),
+          provider: 'XENDIT',
+          currency: 'IDR',
+          payment_method: 'QRIS',
+          status: PaymentStatus.CREATED,
+          metadata: (dto.metadata ?? {}) as Prisma.InputJsonValue,
+        },
+      });
 
-  async insertToAuditTransaction(input: {
-    transaction_id: string;
-    action: string;
-    old_status?: string | null;
-    new_status?: string | null;
-    payload?: unknown;
-    provider_event_id?: string | null;
-    provider_response?: unknown;
-    note?: string | null;
-    performed_by?: "system" | "webhook" | "admin";
-    changed_by?: "system" | "webhook" | "admin";
+      await tx.paymentTransactionAudit.create({
+        data: {
+          transaction_id: transactionId,
+          action: 'IDEMPOTENCY_REGISTERED',
+          note: dto.idempotencyKey,
+          performed_by: 'system',
+          changed_by: 'system',
+        },
+      });
+
+      return payment;
+    });
+  }
+  async updateAfterProvider(input: {
+    transactionId: string;
+    providerRef: string;
+    providerStatus: string;
+    internalStatus: PaymentStatus;
+    qrString?: string | null;
+    providerResponse?: unknown;
   }) {
-    const {
-      transaction_id,
-      action,
-      old_status = null,
-      new_status = null,
-      payload = null,
-      provider_event_id = null,
-      provider_response = null,
-      note = null,
-      performed_by = "system",
-      changed_by = performed_by,
-    } = input;
+    return prisma.$transaction(async (tx) => {
+      const updated = await tx.paymentTransaction.update({
+        where: { transaction_id: input.transactionId },
+        data: {
+          provider_ref: input.providerRef,
+          provider_status: input.providerStatus,
+          qr_string: input.qrString,
+          status: input.internalStatus,
+        },
+      });
 
-    await db.query(
-      `
-    INSERT INTO spklu.payment_transactions_audit
-    (
-      transaction_id,
-      action,
-      payload,
-      performed_by,
-      performed_at,
-      note,
-      old_status,
-      new_status,
-      provider_event_id,
-      provider_response,
-      changed_by,
-      created_at
-    )
-    VALUES
-    (
-      $1,$2,$3,$4,now(),$5,$6,$7,$8,$9,$10,now()
-    )
-    `,
-      [
-        transaction_id,
-        action,
-        payload,
-        performed_by,
-        note,
-        old_status,
-        new_status,
-        provider_event_id,
-        provider_response,
-        changed_by,
-      ]
-    );
+      await tx.paymentTransactionAudit.create({
+        data: {
+          transaction_id: input.transactionId,
+          action: 'PROVIDER_CREATE_SUCCESS',
+          old_status: 'CREATED',
+          new_status: input.internalStatus,
+          payload: (input.providerResponse ?? null) as Prisma.InputJsonValue,
+          performed_by: 'system',
+          changed_by: 'system',
+        },
+      });
+
+      return updated;
+    });
+  }
+
+  async markProviderCreateFailed(transactionId: string, payload: unknown) {
+    await prisma.paymentTransactionAudit.create({
+      data: {
+        transaction_id: transactionId,
+        action: 'PROVIDER_CREATE_FAILED',
+        old_status: 'CREATED',
+        new_status: 'CREATED',
+        payload: (payload ?? null) as Prisma.InputJsonValue,
+        note: 'Failed to create QR at provider',
+        performed_by: 'system',
+        changed_by: 'system',
+      },
+    });
   }
 
   getTransactionById(id: string) {
-    return db.query(
-      `SELECT transaction_id, status, amount
-       FROM spklu.payment_transactions
-       WHERE transaction_id = $1
-       LIMIT 1`,
-      [id]
-    );
+    return prisma.paymentTransaction.findUnique({
+      where: { transaction_id: id },
+    });
   }
 
-  /* =========================
-     WEBHOOK HANDLER (FULL DB)
-  ========================= */
+  buildEventKey(params: {
+    providerName: string;
+    providerEventId: string | null;
+    transactionId: string | null;
+    providerStatus?: string | null;
+  }) {
+    if (params.providerEventId) {
+      return `${params.providerName}:${params.providerEventId}`;
+    }
+
+    return `${params.providerName}:${params.transactionId ?? 'unknown'}:${params.providerStatus ?? 'unknown'}`;
+  }
+
+  async saveWebhookEvent(params: {
+    providerName: string;
+    providerEventId: string | null;
+    transactionId: string | null;
+    providerStatus: string | null;
+    payload: unknown;
+  }) {
+    const eventKey = this.buildEventKey({
+      providerName: params.providerName,
+      providerEventId: params.providerEventId,
+      transactionId: params.transactionId,
+      providerStatus: params.providerStatus,
+    });
+
+    return prisma.webhookEvent.upsert({
+      where: {
+        event_key: eventKey,
+      },
+      update: {},
+      create: {
+        provider_name: params.providerName,
+        provider_event_id: params.providerEventId,
+        event_key: eventKey,
+        transaction_id: params.transactionId,
+        payload: (params.payload ?? {}) as Prisma.InputJsonValue,
+      },
+    });
+  }
+
   async processWebhookUpdate(params: {
-    externalId: string | null;
+    transactionId: string | null;
     providerRef: string | null;
     providerStatus: string;
     payload: unknown;
     providerEventId: string | null;
+    internalStatus: PaymentStatus;
+    providerEventAt?: string | null;
   }) {
-    const client = await db.connect();
-    try {
-      // 1. audit raw event
-      try {
-        await client.query(
-          `INSERT INTO spklu.webhook_events
-           (provider_name, provider_event_id, transaction_id, payload)
-           VALUES ($1,$2,$3,$4)`,
-          ["xendit", params.providerEventId, params.externalId, params.payload]
-        );
-      } catch {
-        // ignore duplicate
+    const eventKey = this.buildEventKey({
+      providerName: 'xendit',
+      providerEventId: params.providerEventId,
+      transactionId: params.transactionId,
+      providerStatus: params.providerStatus,
+    });
+
+    return prisma.$transaction(async (tx) => {
+      const payment = await tx.paymentTransaction.findFirst({
+        where: {
+          OR: [
+            { transaction_id: params.transactionId ?? undefined },
+            { provider_ref: params.providerRef ?? undefined },
+          ],
+        },
+      });
+
+      if (!payment) {
+        return { skipped: true, reason: 'payment_not_found' };
       }
 
-      // 2. lock transaction row
-      await client.query("BEGIN");
+      if (payment.provider_status === params.providerStatus) {
+        await tx.webhookEvent.updateMany({
+          where: {
+            event_key: eventKey,
+            processed_at: null,
+          },
+          data: {
+            processed_at: new Date(),
+            process_error: null,
+          },
+        });
 
-      const { rows } = await client.query(
-        `SELECT transaction_id, provider_status
-         FROM spklu.payment_transactions
-         WHERE transaction_id = $1 OR provider_ref = $2
-         LIMIT 1
-         FOR UPDATE`,
-        [params.externalId, params.providerRef]
-      );
-
-      if (!rows.length) {
-        await client.query("COMMIT");
-        return { skipped: true };
+        return { skipped: true, reason: 'same_provider_status' };
       }
 
-      const local = rows[0];
-      const oldStatus = (local.provider_status ?? "").toString().trim();
+      const paidAt =
+        params.internalStatus === PaymentStatus.PAID
+          ? payment.paid_at ??
+          (params.providerEventAt ? new Date(params.providerEventAt) : new Date())
+          : payment.paid_at;
 
-      if (oldStatus === params.providerStatus) {
-        await client.query("COMMIT");
-        return { skipped: true };
-      }
+      const updated = await tx.paymentTransaction.update({
+        where: { transaction_id: payment.transaction_id },
+        data: {
+          provider_status: params.providerStatus,
+          status: params.internalStatus,
+          paid_at: paidAt,
+        },
+      });
 
+      await tx.paymentTransactionAudit.create({
+        data: {
+          transaction_id: payment.transaction_id,
+          action: 'STATUS_UPDATE',
+          old_status: payment.provider_status,
+          new_status: params.providerStatus,
+          provider_event_id: params.providerEventId,
+          provider_response: (params.payload ?? null) as Prisma.InputJsonValue,
+          changed_by: 'webhook',
+          performed_by: 'webhook',
+        },
+      });
 
+      await tx.webhookEvent.updateMany({
+        where: {
+          event_key: eventKey,
+          processed_at: null,
+        },
+        data: {
+          processed_at: new Date(),
+          process_error: null,
+        },
+      });
 
+      return updated;
+    });
+  }
+  async enqueueReconcile(transactionId: string, reason: string, payload?: unknown) {
+    return prisma.reconcileJob.create({
+      data: {
+        transaction_id: transactionId,
+        reason,
+        payload: (payload ?? null) as Prisma.InputJsonValue,
+      },
+    });
+  }
 
-      // 3. update transaction
-      await client.query(
-        `UPDATE spklu.payment_transactions
-   SET
-     provider_status = $1,
-     status = COALESCE($2, status),
-     updated_at = now()
-   WHERE transaction_id = $3`,
-        [
-          params.providerStatus,
-          mapProviderToInternalStatus(params.providerStatus),
-          local.transaction_id,
-        ]
-      );
+  async touchLastChecked(transactionId: string) {
+    return prisma.paymentTransaction.update({
+      where: { transaction_id: transactionId },
+      data: { last_checked_at: new Date() },
+    });
+  }
 
-      // 4. audit status change
-      await client.query(
-        `INSERT INTO spklu.payment_transactions_audit
-   (
-     transaction_id,
-     action,
-     old_status,
-     new_status,
-     provider_event_id,
-     provider_response,
-     changed_by
-   )
-   VALUES ($1,$2,$3,$4,$5,$6,'webhook')`,
-        [
-          local.transaction_id,
-          "STATUS_UPDATE",          // ✅ action (WAJIB)
-          oldStatus,
-          params.providerStatus,
-          params.providerEventId,
-          params.payload,
-        ]
-      );
+  async findPendingForReconcile(limit = 20) {
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const oneMinuteAgo = new Date(Date.now() - 60 * 1000);
 
-      await client.query("COMMIT");
+    return prisma.paymentTransaction.findMany({
+      where: {
+        status: { in: [PaymentStatus.CREATED, PaymentStatus.PENDING] },
+        created_at: { lt: fiveMinutesAgo },
+        OR: [
+          { last_checked_at: null },
+          { last_checked_at: { lt: oneMinuteAgo } },
+        ],
+        provider_ref: { not: null },
+      },
+      orderBy: { created_at: 'asc' },
+      take: limit,
+    });
+  }
 
-      return {
-        success: true,
-        transaction_id: local.transaction_id,
-        provider_status: params.providerStatus,
-      };
-    } catch (e) {
-      await client.query("ROLLBACK");
-      throw e;
-    } finally {
-      client.release();
-    }
+  async createRetryJob(transactionId: string, errorMessage: string) {
+    return prisma.paymentTransactionJob.upsert({
+      where: { transaction_id: transactionId },
+      update: {
+        send_attempts: { increment: 1 },
+        last_attempt_at: new Date(),
+        last_error: errorMessage,
+        next_retry_at: new Date(Date.now() + 60_000),
+      },
+      create: {
+        transaction_id: transactionId,
+        send_attempts: 1,
+        last_attempt_at: new Date(),
+        last_error: errorMessage,
+        next_retry_at: new Date(Date.now() + 60_000),
+      },
+    });
   }
 }

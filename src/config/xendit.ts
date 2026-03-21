@@ -2,14 +2,14 @@ import axios from "axios";
 import { env } from "./env";
 
 
-const xendit_apiKEY = env.XENDIT_API_KEY;
+const auth = Buffer.from(`${env.XENDIT_API_KEY}:`).toString('base64');
 
 const xendit = axios.create({
     baseURL: "https://api.xendit.co/",
 
     headers: {
         "Content-Type": "application/json",
-        "Authorization": `Basic ${xendit_apiKEY}`
+        "Authorization": `Basic ${auth}`
 
     }
 });

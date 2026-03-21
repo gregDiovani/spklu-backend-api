@@ -1,20 +1,24 @@
 export interface XenditQrPaymentWebhook {
-    event: "qr.payment"
-    id: string                    // qrpy_xxx (provider payment id)
-    status: "COMPLETED" | "PENDING" | "FAILED"
-    amount: number
-    created: string
-
-    qr_code: {
-        external_id: string         // externalId kamu
-        id: string                  // qr_xxx
-        type: "DYNAMIC" | "STATIC"
-        qr_string: string
-        metadata: Record<string, any> | null
-    }
-
-    payment_details?: {
-        receipt_id: string | null
-        source: string
-    }
+    event: 'qr.payment' | string;
+    created: string;
+    business_id: string;
+    data: {
+        id: string;
+        business_id: string;
+        currency: string;
+        amount: number;
+        status: 'SUCCEEDED' | 'PENDING' | 'FAILED' | string;
+        created: string;
+        qr_id: string;
+        qr_string: string;
+        reference_id: string;
+        type: 'DYNAMIC' | 'STATIC' | string;
+        channel_code: string;
+        expires_at: string;
+        metadata?: Record<string, unknown>;
+        payment_detail?: {
+            receipt_id?: string;
+            source?: string;
+        };
+    };
 }

@@ -36,36 +36,30 @@ export async function buildApp() {
   });
 
 
-        app.register(cors, {
-        origin: (origin, cb) => {
-          // allow tools without origin (curl, postman, native server calls)
-          if (!origin) return cb(null, true);
 
-          // DEV MODE — allow everything
-          if (process.env.NODE_ENV !== "production") {
-            return cb(null, true);
-          }
+  app.addHook("onSend", async (req, reply) => {
+    if (req.url.startsWith("/portfolio/files")) {
+      reply.header("Cross-Origin-Resource-Policy", "cross-origin");
+    }
+  });
 
-          // PROD MODE — restrict
-          const normalized = origin.replace(/\/$/, "");
+  // CORS untuk API
+  app.register(cors, {
+    origin: [
+      "https://gregdiovani.my.id",
+      "https://dashboard.qunangqunang.com",
+    ],
+    credentials: true,
+  });
 
-          const allowed = [
-            "https://dashboard.qunangqunang.com",
-            "https://gregdiovani.my.id"
-          ];
 
-          if (allowed.includes(normalized)) {
-            return cb(null, true);
-          }
-
-          cb(new Error("Not allowed by CORS"), false);
-        },
-        credentials: true,
-      });
   app.register(cookie, { secret: env.COOKIE_SECRET });
   app.register(helmet, { contentSecurityPolicy: false });
-  app.register(rateLimit, { max: 100, timeWindow: "1 minute" });
-
+  app.register(rateLimit, {
+    redis,                 // 🔥 INI KUNCI
+    max: 100,
+    timeWindow: "1 minute",
+  });
   app.setErrorHandler((error, _req, reply) => {
     app.log.error(error);
     reply.code((error as any).statusCode ?? 500).send({
@@ -82,7 +76,7 @@ export async function buildApp() {
   app.register(paymentRoutes, { prefix: "/payment" });
   app.register(userRoutes, { prefix: "/user" });
 
-app.register(portfolioRoutes, { prefix: "/portfolio" });
+  app.register(portfolioRoutes, { prefix: "/portfolio" });
 
 
 

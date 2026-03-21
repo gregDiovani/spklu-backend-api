@@ -28,13 +28,17 @@ export async function getProject(
     const result = await portfolioService.getProjectExperience(limit, page);
 
 
-    const mapped = result.data.map((item: any)   => ({
-  ...item,
-  image_url: `${env.BASE_URL}/portfolio/files/${item.image_url}`
-}));
+    const mapped = result.data.map((item: any) => ({
+      ...item,
+      image_url: `${env.BASE_URL}/uploads/${item.image_url}`
+    }));
 
 
-reply.send(mapped);
+    reply.send({
+      success: true,
+      message: "Featured projects fetched successfully",
+      data: mapped,
+    });
 
   } catch (err: any) {
     reply.code(500).send({
@@ -51,9 +55,11 @@ export async function showFile(
 ) {
   const { name } = req.params;
 
-  const { buffer, mime } = await portfolioFileService.getFile(name);
+  if (!name || name.includes("..")) {
+    return reply.code(400).send({ message: "Invalid path" });
+  }
 
-  reply
-    .header("Content-Type", mime)
-    .send(buffer);
+  return reply.send({
+    url: `https://api.gregdiovani.my.id/uploads/${encodeURIComponent(name)}`,
+  });
 }

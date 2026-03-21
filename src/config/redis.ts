@@ -1,9 +1,7 @@
 import Redis from "ioredis";
+import { env } from "./env";
 
-export const redis = new Redis({
-    host: "127.0.0.1",
-    port: 6379,
-    showFriendlyErrorStack: false,
-});
+export const redis = new Redis(env.REDIS_URL!);
+
 
 

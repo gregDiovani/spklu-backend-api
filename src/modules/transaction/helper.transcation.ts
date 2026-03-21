@@ -1,20 +1,19 @@
-export function mapProviderToInternalStatus(providerStatus: string): string | null {
-    switch (providerStatus) {
-        case "COMPLETED":
-        case "SUCCEEDED":
-            return "PAID";
+import { PaymentStatus } from '@prisma/client';
 
-        case "ACTIVE":
-        case "PENDING":
-            return "PENDING";
-
-        case "EXPIRED":
-            return "EXPIRED";
-
-        case "FAILED":
-            return "FAILED";
-
-        default:
-            return null; // status tidak dikenal → jangan update internal
-    }
+export function mapProviderToInternalStatus(status: string): PaymentStatus {
+  const s = String(status || '').toUpperCase();
+  switch (s) {
+    case 'ACTIVE':
+    case 'PENDING':
+      return PaymentStatus.PENDING;
+    case 'SUCCEEDED':
+    case 'COMPLETED':
+      return PaymentStatus.PAID;
+    case 'EXPIRED':
+      return PaymentStatus.EXPIRED;
+    case 'FAILED':
+      return PaymentStatus.FAILED;
+    default:
+      return PaymentStatus.PENDING;
+  }
 }
